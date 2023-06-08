@@ -1,14 +1,13 @@
 package ratelimiter
 
 import (
-	"math"
 	"sync"
 	"time"
 )
 
 // A rate limiter with a manually specified maximum; throttles when the maximum is exceeded or when Backoff() is called
 type CappedRateLimiter struct {
-	// set by contstructor args
+	// set by constructor args
 	maxPerInterval int           // maximum number of requests per interval (ex: 7 for "7 requests per minute")
 	interval       time.Duration // (ex: time.Minute for "7 requests per minute")
 	streakLength   int           // number of successful requests that must be made before stepping up the current rate
@@ -71,10 +70,10 @@ func (rl *CappedRateLimiter) Backoff() {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 	// exponential backoff
-	rl.successStreak = 0
-	rl.currentPerMinute = int(math.Floor(float64(rl.currentPerMinute) * rl.backoffFactor))
+	rl.currentPerMinute = int(float64(rl.currentPerMinute) * rl.backoffFactor)
 	if rl.currentPerMinute < 1 {
 		rl.currentPerMinute = 1
 	}
 	rl.currentLimiter.Reset(rl.interval / time.Duration(rl.currentPerMinute))
+	rl.successStreak = 0
 }
