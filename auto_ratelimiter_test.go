@@ -11,12 +11,12 @@ func TestAutoRateLimit(t *testing.T) {
 	const secondsToTest = 15
 
 	rl := NewAutoRateLimiter(2, .9)
-	rlt := rateLimitTester{maxRate: time.Second}
+	rlt := rateLimitTester{minFrequency: time.Second}
 
 	keepLooping := true
 	go func() {
 		for keepLooping {
-			RateLimitedCall(rl, rlt.callWithSpeedLimit, "lorem ipsum")
+			RateLimitedRetryCall(rl, 5, rlt.callWithSpeedLimit, "lorem ipsum")
 			time.Sleep(time.Second / 100)
 		}
 	}()

@@ -9,14 +9,14 @@ import (
 )
 
 type rateLimitTester struct {
-	lastCall *time.Time
-	maxRate  time.Duration
+	lastCall     *time.Time
+	minFrequency time.Duration
 }
 
 func (rlt *rateLimitTester) callWithSpeedLimit(key string) (int, error) {
 	now := time.Now()
 	if rlt.lastCall != nil {
-		if rlt.lastCall.Add(rlt.maxRate).After(now) {
+		if rlt.minFrequency > time.Since(*rlt.lastCall) {
 			return 0, RateLimitExceeded{Err: errors.New("going too fast!")}
 		}
 	}
@@ -27,7 +27,7 @@ func (rlt *rateLimitTester) callWithSpeedLimit(key string) (int, error) {
 func (rlt *rateLimitTester) failWithSpeedLimit(key string) (int, error) {
 	now := time.Now()
 	if rlt.lastCall != nil {
-		if rlt.lastCall.Add(rlt.maxRate).After(now) {
+		if rlt.lastCall.Add(rlt.minFrequency).After(now) {
 			return 0, RateLimitExceeded{Err: errors.New("going too fast!")}
 		}
 	}
@@ -35,13 +35,13 @@ func (rlt *rateLimitTester) failWithSpeedLimit(key string) (int, error) {
 	return 0, errors.New("A different error!")
 }
 
-func TestRateLimitedCall(t *testing.T) {
-	rlt := rateLimitTester{maxRate: time.Second}
+func TestRateLimitedRetryCall(t *testing.T) {
+	rlt := rateLimitTester{minFrequency: time.Second}
 
 	limiter := NewCappedRateLimiter(120, time.Minute, 1, 0.5)
 
 	for i := 0; i < 5; i++ {
-		val, err := RateLimitedCall(limiter, rlt.callWithSpeedLimit, "lorem ipsum")
+		val, err := RateLimitedRetryCall(limiter, 5, rlt.callWithSpeedLimit, "lorem ipsum")
 		if err != nil {
 			t.Error(err)
 		}
@@ -51,7 +51,7 @@ func TestRateLimitedCall(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		_, err := RateLimitedCall(limiter, rlt.failWithSpeedLimit, "dolor sit amet")
+		_, err := RateLimitedRetryCall(limiter, 5, rlt.failWithSpeedLimit, "dolor sit amet")
 		if err == nil {
 			t.Error("expected error not returned!")
 		}
@@ -59,11 +59,11 @@ func TestRateLimitedCall(t *testing.T) {
 	}
 }
 
-func TestWrapWithLimit(t *testing.T) {
-	rlt := rateLimitTester{maxRate: time.Second}
+func TestWrapWithRetryLimit(t *testing.T) {
+	rlt := rateLimitTester{minFrequency: time.Second}
 
 	limiter := NewCappedRateLimiter(120, time.Minute, 1, 0.5)
-	wrappedCallWithSpeedLimit := WrapWithLimit(limiter, rlt.callWithSpeedLimit)
+	wrappedCallWithSpeedLimit := WrapWithRetryLimit(limiter, 5, rlt.callWithSpeedLimit)
 
 	for i := 0; i < 5; i++ {
 		val, err := wrappedCallWithSpeedLimit("lorem ipsum")
@@ -75,7 +75,7 @@ func TestWrapWithLimit(t *testing.T) {
 		}
 	}
 
-	wrappedFailWithSpeedLimit := WrapWithLimit(limiter, rlt.failWithSpeedLimit)
+	wrappedFailWithSpeedLimit := WrapWithRetryLimit(limiter, 5, rlt.failWithSpeedLimit)
 	for i := 0; i < 5; i++ {
 		_, err := wrappedFailWithSpeedLimit("dolor sit amet")
 		if err == nil {
