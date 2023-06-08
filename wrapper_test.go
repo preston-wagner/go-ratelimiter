@@ -58,3 +58,29 @@ func TestRateLimitedCall(t *testing.T) {
 		assert.Equal(t, err.Error(), "A different error!")
 	}
 }
+
+func TestWrapWithLimit(t *testing.T) {
+	rlt := rateLimitTester{maxRate: time.Second}
+
+	limiter := NewCappedRateLimiter(120, time.Minute, 1, 0.5)
+	wrappedCallWithSpeedLimit := WrapWithLimit(limiter, rlt.callWithSpeedLimit)
+
+	for i := 0; i < 5; i++ {
+		val, err := wrappedCallWithSpeedLimit("lorem ipsum")
+		if err != nil {
+			t.Error(err)
+		}
+		if val != 7 {
+			t.Error("unexpected value returned")
+		}
+	}
+
+	wrappedFailWithSpeedLimit := WrapWithLimit(limiter, rlt.failWithSpeedLimit)
+	for i := 0; i < 5; i++ {
+		_, err := wrappedFailWithSpeedLimit("dolor sit amet")
+		if err == nil {
+			t.Error("expected error not returned!")
+		}
+		assert.Equal(t, err.Error(), "A different error!")
+	}
+}

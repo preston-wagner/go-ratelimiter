@@ -2,7 +2,9 @@ package ratelimiter
 
 import "errors"
 
-func RateLimitedCall[ARG_TYPE any, RETURN_TYPE any](rl RateLimiter, wrapped func(arg ARG_TYPE) (RETURN_TYPE, error), arg ARG_TYPE) (RETURN_TYPE, error) {
+type BasicLimitableCall[ARG_TYPE any, RETURN_TYPE any] func(arg ARG_TYPE) (RETURN_TYPE, error)
+
+func RateLimitedCall[ARG_TYPE any, RETURN_TYPE any](rl RateLimiter, wrapped BasicLimitableCall[ARG_TYPE, RETURN_TYPE], arg ARG_TYPE) (RETURN_TYPE, error) {
 	for {
 		rl.LimitRate()
 		result, err := wrapped(arg)
@@ -17,5 +19,11 @@ func RateLimitedCall[ARG_TYPE any, RETURN_TYPE any](rl RateLimiter, wrapped func
 				return result, err
 			}
 		}
+	}
+}
+
+func WrapWithLimit[ARG_TYPE any, RETURN_TYPE any](rl RateLimiter, wrapped BasicLimitableCall[ARG_TYPE, RETURN_TYPE]) BasicLimitableCall[ARG_TYPE, RETURN_TYPE] {
+	return func(arg ARG_TYPE) (RETURN_TYPE, error) {
+		return RateLimitedCall(rl, wrapped, arg)
 	}
 }
