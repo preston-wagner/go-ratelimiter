@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRateLimit(t *testing.T) {
+func TestCappedRateLimit(t *testing.T) {
 	const secondsToTest = 8
-	rl := NewCappedRateLimiter(60)
+	rl := NewCappedRateLimiter(60, time.Minute, 10, .5)
 
 	tickCount := 0
 	keepLooping := true
@@ -34,9 +34,9 @@ func TestRateLimit(t *testing.T) {
 	assert.LessOrEqual(t, tickCount, secondsToTest+1)
 }
 
-func TestRateLimitBackOff(t *testing.T) {
+func TestCappedRateLimitBackOff(t *testing.T) {
 	const secondsToTest = 8
-	rl := NewCappedRateLimiter(60)
+	rl := NewCappedRateLimiter(60, time.Minute, 10, .5)
 
 	tickCount := 0
 	keepLooping := true
