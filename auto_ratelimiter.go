@@ -7,7 +7,7 @@ import (
 
 // A rate limiter that "feels out" the limits of the api being accessed; begins throttling when Backoff() is called
 type AutoRateLimiter struct {
-	// set by contstructor args
+	// set by constructor args
 	streakLength  int     // number of successful requests that must be made before stepping up the current rate
 	backoffFactor float64 // amount to decrease current rate when Backoff() is called (ex: 0.75 for "reduce limit by 25%")
 	// automatically set
