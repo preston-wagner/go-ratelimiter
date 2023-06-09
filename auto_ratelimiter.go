@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// A rate limiter that "feels out" the limits of the api being accessed; throttles when the maximum is exceeded or when Backoff() is called
+// A rate limiter that "feels out" the limits of the api being accessed; begins throttling when Backoff() is called
 type AutoRateLimiter struct {
 	// set by contstructor args
 	streakLength  int     // number of successful requests that must be made before stepping up the current rate
@@ -18,15 +18,16 @@ type AutoRateLimiter struct {
 	lock             *sync.RWMutex
 }
 
+// A rate limiter that "feels out" the limits of the api being accessed; begins throttling when Backoff() is called
 func NewAutoRateLimiter(streakLength int, backoffFactor float64) *AutoRateLimiter {
 	if streakLength <= 0 {
-		panic("NewCappedRateLimiter streakLength must be > 0")
+		panic("NewAutoRateLimiter streakLength must be > 0")
 	}
 	if backoffFactor <= 0 {
-		panic("NewCappedRateLimiter backoffFactor must be > 0")
+		panic("NewAutoRateLimiter backoffFactor must be > 0")
 	}
 	if backoffFactor >= 1 {
-		panic("NewCappedRateLimiter backoffFactor must be < 1")
+		panic("NewAutoRateLimiter backoffFactor must be < 1")
 	}
 
 	return &AutoRateLimiter{
@@ -42,8 +43,8 @@ func NewAutoRateLimiter(streakLength int, backoffFactor float64) *AutoRateLimite
 func (rl *AutoRateLimiter) LimitRate() {
 	rl.lock.RLock()
 	defer rl.lock.RUnlock()
+	// if currentLimiter is nil, then Backoff() has not been called at all yet
 	if rl.currentLimiter != nil {
-		// if currentLimiter is nil, then Backoff() has not been called at all yet
 		<-rl.currentLimiter.C
 	}
 }

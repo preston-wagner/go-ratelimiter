@@ -13,12 +13,13 @@ type CappedRateLimiter struct {
 	streakLength   int           // number of successful requests that must be made before stepping up the current rate
 	backoffFactor  float64       // amount to decrease current rate when Backoff() is called (ex: 0.75 for "reduce limit by 25%")
 	// automatically set
-	currentPerMinute int
-	currentLimiter   *time.Ticker
-	successStreak    int
-	lock             *sync.RWMutex
+	currentPerInterval int
+	currentLimiter     *time.Ticker
+	successStreak      int
+	lock               *sync.RWMutex
 }
 
+// A rate limiter with a manually specified maximum; throttles when the maximum is exceeded or when Backoff() is called
 func NewCappedRateLimiter(maxPerInterval int, interval time.Duration, streakLength int, backoffFactor float64) *CappedRateLimiter {
 	if maxPerInterval <= 0 {
 		panic("NewCappedRateLimiter maxPerInterval must be > 0")
@@ -42,10 +43,10 @@ func NewCappedRateLimiter(maxPerInterval int, interval time.Duration, streakLeng
 		streakLength:   streakLength,
 		backoffFactor:  backoffFactor,
 
-		currentPerMinute: maxPerInterval,
-		currentLimiter:   time.NewTicker(interval / time.Duration(maxPerInterval)),
-		successStreak:    0,
-		lock:             &sync.RWMutex{},
+		currentPerInterval: maxPerInterval,
+		currentLimiter:     time.NewTicker(interval / time.Duration(maxPerInterval)),
+		successStreak:      0,
+		lock:               &sync.RWMutex{},
 	}
 }
 
@@ -59,9 +60,9 @@ func (rl *CappedRateLimiter) Success() {
 	// linear growth
 	rl.successStreak++
 	if (rl.successStreak % rl.streakLength) == 0 {
-		if rl.currentPerMinute < rl.maxPerInterval {
-			rl.currentPerMinute++
-			rl.currentLimiter.Reset(rl.interval / time.Duration(rl.currentPerMinute))
+		if rl.currentPerInterval < rl.maxPerInterval {
+			rl.currentPerInterval++
+			rl.currentLimiter.Reset(rl.interval / time.Duration(rl.currentPerInterval))
 		}
 	}
 }
@@ -70,10 +71,10 @@ func (rl *CappedRateLimiter) Backoff() {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 	// exponential backoff
-	rl.currentPerMinute = int(float64(rl.currentPerMinute) * rl.backoffFactor)
-	if rl.currentPerMinute < 1 {
-		rl.currentPerMinute = 1
+	rl.currentPerInterval = int(float64(rl.currentPerInterval) * rl.backoffFactor)
+	if rl.currentPerInterval < 1 {
+		rl.currentPerInterval = 1
 	}
-	rl.currentLimiter.Reset(rl.interval / time.Duration(rl.currentPerMinute))
+	rl.currentLimiter.Reset(rl.interval / time.Duration(rl.currentPerInterval))
 	rl.successStreak = 0
 }
