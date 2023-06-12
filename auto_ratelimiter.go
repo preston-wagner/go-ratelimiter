@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// A rate limiter that "feels out" the limits of the api being accessed; begins throttling when Backoff() is called
-type AutoRateLimiter struct {
+type autoRateLimiter struct {
 	// set by constructor args
 	streakLength  int     // number of successful requests that must be made before stepping up the current rate
 	backoffFactor float64 // amount to decrease current rate when Backoff() is called (ex: 0.75 for "reduce limit by 25%")
@@ -19,7 +18,7 @@ type AutoRateLimiter struct {
 }
 
 // A rate limiter that "feels out" the limits of the api being accessed; begins throttling when Backoff() is called
-func NewAutoRateLimiter(streakLength int, backoffFactor float64) *AutoRateLimiter {
+func NewAutoRateLimiter(streakLength int, backoffFactor float64) RateLimiter {
 	if streakLength <= 0 {
 		panic("NewAutoRateLimiter streakLength must be > 0")
 	}
@@ -30,7 +29,7 @@ func NewAutoRateLimiter(streakLength int, backoffFactor float64) *AutoRateLimite
 		panic("NewAutoRateLimiter backoffFactor must be < 1")
 	}
 
-	return &AutoRateLimiter{
+	return &autoRateLimiter{
 		streakLength:  streakLength,
 		backoffFactor: backoffFactor,
 
@@ -40,7 +39,7 @@ func NewAutoRateLimiter(streakLength int, backoffFactor float64) *AutoRateLimite
 	}
 }
 
-func (rl *AutoRateLimiter) LimitRate() {
+func (rl *autoRateLimiter) LimitRate() {
 	rl.lock.RLock()
 	defer rl.lock.RUnlock()
 	// if currentLimiter is nil, then Backoff() has not been called at all yet
@@ -49,7 +48,7 @@ func (rl *AutoRateLimiter) LimitRate() {
 	}
 }
 
-func (rl *AutoRateLimiter) Success() {
+func (rl *autoRateLimiter) Success() {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 	// linear growth
@@ -62,7 +61,7 @@ func (rl *AutoRateLimiter) Success() {
 	}
 }
 
-func (rl *AutoRateLimiter) Backoff() {
+func (rl *autoRateLimiter) Backoff() {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 	if rl.currentLimiter == nil {
@@ -83,4 +82,15 @@ func (rl *AutoRateLimiter) Backoff() {
 	}
 	rl.currentLimiter.Reset(time.Minute / time.Duration(rl.currentPerMinute))
 	rl.successStreak = 0
+}
+
+func (rl *autoRateLimiter) GetCurrentRate() *time.Duration {
+	rl.lock.RLock()
+	defer rl.lock.RUnlock()
+	if rl.currentLimiter == nil {
+		return nil
+	} else {
+		rate := time.Minute / time.Duration(rl.currentPerMinute)
+		return &rate
+	}
 }

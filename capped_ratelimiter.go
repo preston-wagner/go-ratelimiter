@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// A rate limiter with a manually specified maximum; throttles when the maximum is exceeded or when Backoff() is called
-type CappedRateLimiter struct {
+type cappedRateLimiter struct {
 	// set by constructor args
 	maxPerInterval int           // maximum number of requests per interval (ex: 7 for "7 requests per minute")
 	interval       time.Duration // (ex: time.Minute for "7 requests per minute")
@@ -20,7 +19,7 @@ type CappedRateLimiter struct {
 }
 
 // A rate limiter with a manually specified maximum; throttles when the maximum is exceeded or when Backoff() is called
-func NewCappedRateLimiter(maxPerInterval int, interval time.Duration, streakLength int, backoffFactor float64) *CappedRateLimiter {
+func NewCappedRateLimiter(maxPerInterval int, interval time.Duration, streakLength int, backoffFactor float64) RateLimiter {
 	if maxPerInterval <= 0 {
 		panic("NewCappedRateLimiter maxPerInterval must be > 0")
 	}
@@ -37,7 +36,7 @@ func NewCappedRateLimiter(maxPerInterval int, interval time.Duration, streakLeng
 		panic("NewCappedRateLimiter backoffFactor must be < 1")
 	}
 
-	return &CappedRateLimiter{
+	return &cappedRateLimiter{
 		maxPerInterval: maxPerInterval,
 		interval:       interval,
 		streakLength:   streakLength,
@@ -50,11 +49,11 @@ func NewCappedRateLimiter(maxPerInterval int, interval time.Duration, streakLeng
 	}
 }
 
-func (rl *CappedRateLimiter) LimitRate() {
+func (rl *cappedRateLimiter) LimitRate() {
 	<-rl.currentLimiter.C
 }
 
-func (rl *CappedRateLimiter) Success() {
+func (rl *cappedRateLimiter) Success() {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 	// linear growth
@@ -67,7 +66,7 @@ func (rl *CappedRateLimiter) Success() {
 	}
 }
 
-func (rl *CappedRateLimiter) Backoff() {
+func (rl *cappedRateLimiter) Backoff() {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 	// exponential backoff
@@ -77,4 +76,11 @@ func (rl *CappedRateLimiter) Backoff() {
 	}
 	rl.currentLimiter.Reset(rl.interval / time.Duration(rl.currentPerInterval))
 	rl.successStreak = 0
+}
+
+func (rl *cappedRateLimiter) GetCurrentRate() *time.Duration {
+	rl.lock.RLock()
+	defer rl.lock.RUnlock()
+	rate := rl.interval / time.Duration(rl.currentPerInterval)
+	return &rate
 }

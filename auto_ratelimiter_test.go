@@ -24,6 +24,8 @@ func TestAutoRateLimit(t *testing.T) {
 	time.Sleep(time.Second * secondsToTest)
 	keepLooping = false
 
-	assert.GreaterOrEqual(t, rl.currentPerMinute, 45)
-	assert.LessOrEqual(t, rl.currentPerMinute, 61)
+	currentRate := *rl.GetCurrentRate()
+	currentPerMinute := float64(time.Minute / currentRate)
+	assert.GreaterOrEqual(t, currentPerMinute, 45.0)
+	assert.LessOrEqual(t, currentPerMinute, 61.0)
 }
